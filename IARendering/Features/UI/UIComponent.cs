@@ -4,22 +4,26 @@ using Evergine.Common.Graphics;
 using Evergine.Framework;
 using Evergine.Framework.Graphics;
 using Evergine.Framework.Services;
+using Evergine.Framework.Threading;
 using Evergine.Mathematics;
 using Evergine.UI;
+using IARendering.Features.Screenshots;
 using IARendering.Features.RuntimeAssets.Loaders;
+using IARendering.Features.StableDiffusion;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
+using System.IO;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace IARendering.Features.UI
 {
     public class UIComponent : Behavior
     {
+        private const string AiRenderPrompt = "convert this 3D viewport render into a photorealistic architectural visualization, preserve geometry, perspective, object placement and scale, replace flat 3D materials with realistic PBR materials, add realistic global illumination, contact shadows, fabric texture, wood grain, wall paint texture, realistic plant leaves, natural window light, physically accurate indoor lighting, high quality photorealistic render";
+
         public enum UIMode
         {
             Init = 0,
@@ -35,6 +39,11 @@ namespace IARendering.Features.UI
 
         private Texture evergineLogoTex;
         private ImTextureRef evergineLogo;
+        private StableDiffusionCli stableDiffusionCli;
+        private bool isAiGenerationInProgress;
+        private string aiStatusText = "Load a model to enable AI render generation.";
+        private string lastViewportCapturePath;
+        private string lastAiRenderPath;
 
         public string Text = string.Empty;
 
@@ -45,8 +54,8 @@ namespace IARendering.Features.UI
         protected override bool OnAttached()
         {
             this.evergineLogoTex = this.Managers.AssetSceneManager.Load<Texture>(EvergineContent.Textures.EvergineLogo_png);
-
             this.evergineLogo = this.imGuiManager.CreateImGuiBinding(this.evergineLogoTex);
+            this.stableDiffusionCli = new StableDiffusionCli();
 
 
             return base.OnAttached();
@@ -152,6 +161,8 @@ namespace IARendering.Features.UI
                     }
                     break;
             }
+
+            this.DrawAiRenderPanel();
         }
 
         internal void SetSuportedFiles(Dictionary<RuntimeLoaderType, string[]> extensionsByType)
@@ -165,6 +176,158 @@ namespace IARendering.Features.UI
                 sb.AppendLine($"· {description}: {extensions}");
             }
             this.Text = sb.ToString();
+        }
+
+        private unsafe void DrawAiRenderPanel()
+        {
+            var io = ImguiNative.igGetIO_Nil();
+            float panelWidth = 360;
+            float panelHeight = 220;
+            float margin = 16;
+
+            var panelPosition = new Vector2(io->DisplaySize.X - panelWidth - margin, margin);
+            var panelSize = new Vector2(panelWidth, panelHeight);
+            var flags =
+                ImGuiWindowFlags.NoMove |
+                ImGuiWindowFlags.NoResize |
+                ImGuiWindowFlags.NoCollapse |
+                ImGuiWindowFlags.NoSavedSettings;
+
+            ImguiNative.igSetNextWindowPos(panelPosition, ImGuiCond.Always, Vector2.Zero);
+            ImguiNative.igSetNextWindowSize(panelSize, ImGuiCond.Always);
+
+            if (ImguiNative.igBegin("AI Render", null, flags))
+            {
+                ImguiNative.igTextWrapped("Generate a photorealistic AI render from the current viewport.");
+                ImguiNative.igTextWrapped($"Runtime asset state: {this.CurrentMode}");
+
+                if (this.CurrentMode == UIMode.Loaded)
+                {
+                    if (!this.isAiGenerationInProgress)
+                    {
+                        if (ImguiNative.igButton("Generate AI Render", new Vector2(panelWidth - 32, 0)))
+                        {
+                            this.StartAiRenderGeneration();
+                        }
+                    }
+                    else
+                    {
+                        ImguiNative.igTextWrapped("AI render generation is running...");
+                    }
+                }
+                else
+                {
+                    ImguiNative.igTextWrapped("Load a runtime asset first to capture the viewport and send it to Stable Diffusion.");
+                }
+
+                ImguiNative.igTextWrapped($"Status: {this.aiStatusText}");
+
+                if (!string.IsNullOrWhiteSpace(this.lastViewportCapturePath))
+                {
+                    ImguiNative.igTextWrapped($"Last capture: {Path.GetFileName(this.lastViewportCapturePath)}");
+                }
+
+                if (!string.IsNullOrWhiteSpace(this.lastAiRenderPath))
+                {
+                    ImguiNative.igTextWrapped($"Last output: {Path.GetFileName(this.lastAiRenderPath)}");
+                }
+            }
+
+            ImguiNative.igEnd();
+        }
+
+        private void StartAiRenderGeneration()
+        {
+            if (this.isAiGenerationInProgress)
+            {
+                return;
+            }
+
+            var activeCamera = this.Managers.RenderManager.ActiveCamera3D;
+            var display = activeCamera?.Display;
+            if (display == null)
+            {
+                this.aiStatusText = "Unable to capture the viewport: active display not found.";
+                return;
+            }
+
+            try
+            {
+                var stableDiffusionDirectory = this.stableDiffusionCli.GetStableDiffusionDirectory();
+                var capturesDirectory = Path.Combine(stableDiffusionDirectory, "captures");
+                var resultsDirectory = Path.Combine(stableDiffusionDirectory, "results");
+                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+
+                this.lastViewportCapturePath = Path.Combine(capturesDirectory, $"viewport_{timestamp}.png");
+                this.lastAiRenderPath = Path.Combine(resultsDirectory, $"ai_render_{timestamp}.png");
+
+                var graphicsContext = Application.Current.Container.Resolve<GraphicsContext>();
+                display.SaveDisplayToFile(graphicsContext, this.lastViewportCapturePath);
+
+                var options = this.stableDiffusionCli.CreateDefaultFluxKleinOptions(
+                    this.lastViewportCapturePath,
+                    this.lastAiRenderPath,
+                    AiRenderPrompt);
+
+                this.isAiGenerationInProgress = true;
+                this.aiStatusText = "Viewport captured. Running Stable Diffusion...";
+
+                _ = this.RunAiRenderGenerationAsync(options);
+            }
+            catch (Exception ex)
+            {
+                this.isAiGenerationInProgress = false;
+                this.aiStatusText = $"Capture failed: {ex.Message}";
+            }
+        }
+
+        private async Task RunAiRenderGenerationAsync(StableDiffusionCliOptions options)
+        {
+            try
+            {
+                var result = await this.stableDiffusionCli.RunAsync(options);
+
+                await EvergineForegroundTask.Run(() =>
+                {
+                    this.isAiGenerationInProgress = false;
+
+                    if (result.Success)
+                    {
+                        this.lastAiRenderPath = result.OutputImagePath;
+                        this.aiStatusText = $"AI render generated successfully: {Path.GetFileName(result.OutputImagePath)}";
+                    }
+                    else
+                    {
+                        var error = string.IsNullOrWhiteSpace(result.StandardError) ? result.StandardOutput : result.StandardError;
+                        this.aiStatusText = $"Stable Diffusion failed ({result.ExitCode}): {TrimStatus(error)}";
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                await EvergineForegroundTask.Run(() =>
+                {
+                    this.isAiGenerationInProgress = false;
+                    this.aiStatusText = $"AI render failed: {ex.Message}";
+                });
+            }
+        }
+
+        private static string TrimStatus(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return "No output returned by sd-cli.";
+            }
+
+            text = text.Replace(Environment.NewLine, " ").Trim();
+            const int maxLength = 180;
+            if (text.Length > maxLength)
+            {
+                return text.Substring(0, maxLength) + "...";
+            }
+
+            return text;
         }
 
 
