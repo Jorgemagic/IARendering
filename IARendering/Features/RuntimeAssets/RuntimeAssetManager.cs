@@ -25,8 +25,6 @@ namespace IARendering.Features.RuntimeAssets
 {
     public class RuntimeAssetManager : UpdatableSceneManager
     {
-        private const string AiRenderPrompt = "convert this 3D viewport render into a photorealistic architectural visualization, preserve geometry, perspective, object placement and scale, replace flat 3D materials with realistic PBR materials, add realistic global illumination, contact shadows, fabric texture, wood grain, wall paint texture, realistic plant leaves, natural window light, physically accurate indoor lighting, high quality photorealistic render";
-
         [BindService]
         internal AssetsService AssetsService = null!;
 
@@ -294,9 +292,11 @@ namespace IARendering.Features.RuntimeAssets
                 var options = this.stableDiffusionCli.CreateDefaultFluxKleinOptions(
                     viewportCapturePath,
                     aiRenderPath,
-                    AiRenderPrompt,
+                    this.launcherState.AiRenderPrompt,
                     captureWidth,
                     captureHeight);
+                options.CfgScale = this.launcherState.AiRenderCfgScale;
+                options.Steps = this.launcherState.AiRenderSteps;
 
                 this.isAiGenerationInProgress = true;
                 this.launcherState.BeginAiRenderGeneration(viewportCapturePath);

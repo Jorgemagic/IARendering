@@ -16,12 +16,18 @@ namespace IARendering.Features.Launcher
 
     public sealed class LauncherStateService : INotifyPropertyChanged
     {
+        private const string DefaultAiRenderPrompt = "convert this 3D viewport render into a photorealistic architectural visualization, preserve geometry, perspective, object placement and scale, replace flat 3D materials with realistic PBR materials, add realistic global illumination, contact shadows, fabric texture, wood grain, wall paint texture, realistic plant leaves, natural window light, physically accurate indoor lighting, high quality photorealistic render";
+
         private LauncherWorkflowState workflowState;
         private string supportedExtensionsText = "GLB, STL or OBJ";
         private string? viewportCaptureImagePath;
         private string? resultImagePath;
         private string lastRenderDurationText = "Last Render Time: --";
         private string statusMessage = "Drag and drop a model to begin.";
+        private bool isAiSettingsPanelOpen;
+        private string aiRenderPrompt = DefaultAiRenderPrompt;
+        private float aiRenderCfgScale = 1.0f;
+        private int aiRenderSteps = 4;
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -36,6 +42,14 @@ namespace IARendering.Features.Launcher
         public string LastRenderDurationText => this.lastRenderDurationText;
 
         public string StatusMessage => this.statusMessage;
+
+        public bool IsAiSettingsPanelOpen => this.isAiSettingsPanelOpen;
+
+        public string AiRenderPrompt => this.aiRenderPrompt;
+
+        public float AiRenderCfgScale => this.aiRenderCfgScale;
+
+        public int AiRenderSteps => this.aiRenderSteps;
 
         public bool IsModelLoading => this.workflowState == LauncherWorkflowState.LoadingModel;
 
@@ -56,6 +70,57 @@ namespace IARendering.Features.Launcher
         public bool ShowRenderSpinner => this.workflowState == LauncherWorkflowState.GeneratingRender;
 
         public bool HasRenderResult => !string.IsNullOrWhiteSpace(this.resultImagePath);
+
+        public void SetAiSettingsPanelOpen(bool value)
+        {
+            if (this.isAiSettingsPanelOpen != value)
+            {
+                this.isAiSettingsPanelOpen = value;
+                this.OnPropertyChanged(nameof(this.IsAiSettingsPanelOpen));
+            }
+        }
+
+        public void SetAiRenderPrompt(string prompt)
+        {
+            if (string.IsNullOrWhiteSpace(prompt))
+            {
+                throw new ArgumentException("Prompt cannot be empty.", nameof(prompt));
+            }
+
+            if (!string.Equals(this.aiRenderPrompt, prompt, StringComparison.Ordinal))
+            {
+                this.aiRenderPrompt = prompt;
+                this.OnPropertyChanged(nameof(this.AiRenderPrompt));
+            }
+        }
+
+        public void SetAiRenderCfgScale(float value)
+        {
+            if (value <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), "Cfg scale must be greater than zero.");
+            }
+
+            if (Math.Abs(this.aiRenderCfgScale - value) > 0.0001f)
+            {
+                this.aiRenderCfgScale = value;
+                this.OnPropertyChanged(nameof(this.AiRenderCfgScale));
+            }
+        }
+
+        public void SetAiRenderSteps(int value)
+        {
+            if (value <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), "Steps must be greater than zero.");
+            }
+
+            if (this.aiRenderSteps != value)
+            {
+                this.aiRenderSteps = value;
+                this.OnPropertyChanged(nameof(this.AiRenderSteps));
+            }
+        }
 
         public void SetSupportedExtensions(IEnumerable<string> extensions)
         {

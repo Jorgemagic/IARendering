@@ -3,6 +3,7 @@ using Avalonia.Threading;
 using IARendering.Features.Launcher;
 using System;
 using System.ComponentModel;
+using System.Globalization;
 using System.IO;
 using System.Runtime.CompilerServices;
 
@@ -18,7 +19,12 @@ namespace IARendering.Avalonia.ViewModels
         private string supportedExtensionsText = "GLB, STL or OBJ";
         private string statusMessage = "Drag and drop a model to begin.";
         private string lastRenderDurationText = "Last Render Time: --";
+        private string aiRenderPrompt = string.Empty;
+        private string aiRenderCfgScaleText = string.Empty;
+        private string aiRenderStepsText = string.Empty;
+        private string aiRenderSettingsErrorMessage = string.Empty;
         private bool canGenerateRender;
+        private bool isAiSettingsPanelOpen;
         private bool showViewportSurface;
         private bool showViewportPlaceholder = true;
         private bool showViewportSpinner;
@@ -51,10 +57,72 @@ namespace IARendering.Avalonia.ViewModels
             private set => this.SetProperty(ref this.lastRenderDurationText, value);
         }
 
+        public string AiRenderPrompt
+        {
+            get => this.aiRenderPrompt;
+            set
+            {
+                if (this.SetProperty(ref this.aiRenderPrompt, value))
+                {
+                    this.CommitAiRenderSettings();
+                }
+            }
+        }
+
+        public string AiRenderCfgScaleText
+        {
+            get => this.aiRenderCfgScaleText;
+            set
+            {
+                if (this.SetProperty(ref this.aiRenderCfgScaleText, value))
+                {
+                    this.CommitAiRenderSettings();
+                }
+            }
+        }
+
+        public string AiRenderStepsText
+        {
+            get => this.aiRenderStepsText;
+            set
+            {
+                if (this.SetProperty(ref this.aiRenderStepsText, value))
+                {
+                    this.CommitAiRenderSettings();
+                }
+            }
+        }
+
+        public string AiRenderSettingsErrorMessage
+        {
+            get => this.aiRenderSettingsErrorMessage;
+            private set
+            {
+                if (this.SetProperty(ref this.aiRenderSettingsErrorMessage, value))
+                {
+                    this.OnPropertyChanged(nameof(this.HasAiRenderSettingsError));
+                }
+            }
+        }
+
+        public bool HasAiRenderSettingsError => !string.IsNullOrWhiteSpace(this.AiRenderSettingsErrorMessage);
+
         public bool CanGenerateRender
         {
             get => this.canGenerateRender;
             private set => this.SetProperty(ref this.canGenerateRender, value);
+        }
+
+        public bool IsAiSettingsPanelOpen
+        {
+            get => this.isAiSettingsPanelOpen;
+            set
+            {
+                if (this.SetProperty(ref this.isAiSettingsPanelOpen, value))
+                {
+                    this.launcherState.SetAiSettingsPanelOpen(value);
+                }
+            }
         }
 
         public bool ShowViewportPlaceholder
@@ -158,13 +226,67 @@ namespace IARendering.Avalonia.ViewModels
             this.SupportedExtensionsText = this.launcherState.SupportedExtensionsText;
             this.StatusMessage = this.launcherState.StatusMessage;
             this.LastRenderDurationText = this.launcherState.LastRenderDurationText;
-            this.CanGenerateRender = this.launcherState.CanGenerateRender;
+            this.AiRenderPrompt = this.launcherState.AiRenderPrompt;
+            this.AiRenderCfgScaleText = this.launcherState.AiRenderCfgScale.ToString("0.##", CultureInfo.InvariantCulture);
+            this.AiRenderStepsText = this.launcherState.AiRenderSteps.ToString(CultureInfo.InvariantCulture);
+            this.IsAiSettingsPanelOpen = this.launcherState.IsAiSettingsPanelOpen;
             this.ShowViewportSurface = this.launcherState.ShowViewportSurface;
             this.ShowViewportPlaceholder = this.launcherState.ShowViewportPlaceholder;
             this.ShowViewportSpinner = this.launcherState.ShowViewportSpinner;
             this.ShowRenderSpinner = this.launcherState.ShowRenderSpinner;
             this.UpdateViewportCaptureImage(this.launcherState.ViewportCaptureImagePath);
             this.UpdateResultImage(this.launcherState.ResultImagePath);
+            this.RefreshGenerateAvailability();
+        }
+
+        private void CommitAiRenderSettings()
+        {
+            var prompt = this.AiRenderPrompt ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(prompt))
+            {
+                this.AiRenderSettingsErrorMessage = "Prompt cannot be empty.";
+                this.RefreshGenerateAvailability();
+                return;
+            }
+
+            if (!TryParseFloat(this.AiRenderCfgScaleText, out var cfgScale) || cfgScale <= 0)
+            {
+                this.AiRenderSettingsErrorMessage = "Cfg-scale must be a number greater than 0.";
+                this.RefreshGenerateAvailability();
+                return;
+            }
+
+            if (!TryParseInt(this.AiRenderStepsText, out var steps) || steps <= 0)
+            {
+                this.AiRenderSettingsErrorMessage = "Steps must be an integer greater than 0.";
+                this.RefreshGenerateAvailability();
+                return;
+            }
+
+            this.launcherState.SetAiRenderPrompt(prompt);
+            this.launcherState.SetAiRenderCfgScale(cfgScale);
+            this.launcherState.SetAiRenderSteps(steps);
+            this.AiRenderSettingsErrorMessage = string.Empty;
+            this.RefreshGenerateAvailability();
+        }
+
+        private void RefreshGenerateAvailability()
+        {
+            this.CanGenerateRender = this.launcherState.CanGenerateRender && !this.HasAiRenderSettingsError;
+        }
+
+        private static bool TryParseFloat(string? text, out float value)
+        {
+            text = text?.Trim();
+            return float.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out value)
+                || float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+        }
+
+        private static bool TryParseInt(string? text, out int value)
+        {
+            text = text?.Trim();
+            return int.TryParse(text, NumberStyles.Integer, CultureInfo.CurrentCulture, out value)
+                || int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
         }
 
         private void UpdateViewportCaptureImage(string? imagePath)
