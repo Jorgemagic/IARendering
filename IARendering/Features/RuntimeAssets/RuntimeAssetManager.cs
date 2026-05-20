@@ -299,7 +299,7 @@ namespace IARendering.Features.RuntimeAssets
                     captureHeight);
 
                 this.isAiGenerationInProgress = true;
-                this.launcherState.BeginAiRenderGeneration();
+                this.launcherState.BeginAiRenderGeneration(viewportCapturePath);
                 _ = this.RunAiRenderGenerationAsync(options, Stopwatch.StartNew());
             }
             catch (Exception ex)

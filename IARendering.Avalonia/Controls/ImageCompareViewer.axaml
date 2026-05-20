@@ -1,0 +1,18 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="IARendering.Avalonia.Controls.ImageCompareViewer">
+    <Border x:Name="Viewport"
+            Background="Transparent"
+            ClipToBounds="True">
+        <Canvas x:Name="CanvasRoot">
+            <Image x:Name="RightImage"
+                   Stretch="Fill" />
+            <Image x:Name="LeftImage"
+                   Stretch="Fill" />
+            <Border x:Name="DividerLine"
+                    Width="2"
+                    Background="Black"
+                    IsVisible="False" />
+        </Canvas>
+    </Border>
+</UserControl>

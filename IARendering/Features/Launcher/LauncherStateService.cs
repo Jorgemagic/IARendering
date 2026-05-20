@@ -18,6 +18,7 @@ namespace IARendering.Features.Launcher
     {
         private LauncherWorkflowState workflowState;
         private string supportedExtensionsText = "GLB, STL or OBJ";
+        private string? viewportCaptureImagePath;
         private string? resultImagePath;
         private string lastRenderDurationText = "Last Render Time: --";
         private string statusMessage = "Drag and drop a model to begin.";
@@ -27,6 +28,8 @@ namespace IARendering.Features.Launcher
         public LauncherWorkflowState WorkflowState => this.workflowState;
 
         public string SupportedExtensionsText => this.supportedExtensionsText;
+
+        public string? ViewportCaptureImagePath => this.viewportCaptureImagePath;
 
         public string? ResultImagePath => this.resultImagePath;
 
@@ -81,6 +84,7 @@ namespace IARendering.Features.Launcher
 
         public void BeginModelLoad()
         {
+            this.viewportCaptureImagePath = null;
             this.resultImagePath = null;
             this.lastRenderDurationText = "Last Render Time: --";
             this.statusMessage = "Loading model...";
@@ -104,6 +108,7 @@ namespace IARendering.Features.Launcher
 
         public void FailModelLoad(string? statusMessage = null)
         {
+            this.viewportCaptureImagePath = null;
             this.resultImagePath = null;
             this.lastRenderDurationText = "Last Render Time: --";
             this.statusMessage = string.IsNullOrWhiteSpace(statusMessage) ? "Unable to load the model." : statusMessage;
@@ -111,8 +116,14 @@ namespace IARendering.Features.Launcher
             this.NotifyVisualStateChanged();
         }
 
-        public void BeginAiRenderGeneration()
+        public void BeginAiRenderGeneration(string viewportCaptureImagePath)
         {
+            if (string.IsNullOrWhiteSpace(viewportCaptureImagePath))
+            {
+                throw new ArgumentException("Viewport capture image path is required.", nameof(viewportCaptureImagePath));
+            }
+
+            this.viewportCaptureImagePath = viewportCaptureImagePath;
             this.statusMessage = "Generating IA render...";
             this.workflowState = LauncherWorkflowState.GeneratingRender;
             this.NotifyVisualStateChanged();
@@ -142,6 +153,7 @@ namespace IARendering.Features.Launcher
         private void NotifyVisualStateChanged()
         {
             this.OnPropertyChanged(nameof(this.WorkflowState));
+            this.OnPropertyChanged(nameof(this.ViewportCaptureImagePath));
             this.OnPropertyChanged(nameof(this.ResultImagePath));
             this.OnPropertyChanged(nameof(this.LastRenderDurationText));
             this.OnPropertyChanged(nameof(this.StatusMessage));

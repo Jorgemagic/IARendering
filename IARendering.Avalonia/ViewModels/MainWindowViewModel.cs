@@ -11,7 +11,9 @@ namespace IARendering.Avalonia.ViewModels
     public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     {
         private readonly LauncherStateService launcherState;
+        private Bitmap? viewportCaptureImage;
         private Bitmap? resultImage;
+        private string? loadedViewportCaptureImagePath;
         private string? loadedImagePath;
         private string supportedExtensionsText = "GLB, STL or OBJ";
         private string statusMessage = "Drag and drop a model to begin.";
@@ -103,6 +105,20 @@ namespace IARendering.Avalonia.ViewModels
             }
         }
 
+        public Bitmap? ViewportCaptureImage
+        {
+            get => this.viewportCaptureImage;
+            private set
+            {
+                if (!ReferenceEquals(this.viewportCaptureImage, value))
+                {
+                    this.viewportCaptureImage?.Dispose();
+                    this.viewportCaptureImage = value;
+                    this.OnPropertyChanged();
+                }
+            }
+        }
+
         public bool HasResultImage => this.ResultImage != null;
 
         public bool ShowResultImage => this.HasResultImage && !this.ShowRenderSpinner;
@@ -128,6 +144,7 @@ namespace IARendering.Avalonia.ViewModels
         public void Dispose()
         {
             this.launcherState.PropertyChanged -= this.OnLauncherStateChanged;
+            this.ViewportCaptureImage = null;
             this.ResultImage = null;
         }
 
@@ -146,7 +163,27 @@ namespace IARendering.Avalonia.ViewModels
             this.ShowViewportPlaceholder = this.launcherState.ShowViewportPlaceholder;
             this.ShowViewportSpinner = this.launcherState.ShowViewportSpinner;
             this.ShowRenderSpinner = this.launcherState.ShowRenderSpinner;
+            this.UpdateViewportCaptureImage(this.launcherState.ViewportCaptureImagePath);
             this.UpdateResultImage(this.launcherState.ResultImagePath);
+        }
+
+        private void UpdateViewportCaptureImage(string? imagePath)
+        {
+            if (string.Equals(this.loadedViewportCaptureImagePath, imagePath, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            this.loadedViewportCaptureImagePath = imagePath;
+
+            if (string.IsNullOrWhiteSpace(imagePath) || !File.Exists(imagePath))
+            {
+                this.ViewportCaptureImage = null;
+                return;
+            }
+
+            using var stream = File.OpenRead(imagePath);
+            this.ViewportCaptureImage = new Bitmap(stream);
         }
 
         private void UpdateResultImage(string? imagePath)

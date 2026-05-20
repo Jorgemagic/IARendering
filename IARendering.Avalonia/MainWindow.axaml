@@ -10,12 +10,13 @@
         x:DataType="viewModels:MainWindowViewModel"
         Title="IA Rendering"
         Width="1280"
-        Height="860"
-        MinWidth="960"
-        MinHeight="720"
+        Height="966"
+        MaxHeight="1080"
+        MinWidth="1100"
+        MinHeight="966"
         Background="#202020">
-    <Grid Margin="12"
-          RowDefinitions="3.8*,0.7*,3*,0.35*">
+    <Grid Margin="6"
+          RowDefinitions="420,52,420,28">
         <Border Grid.Row="0"
                 BorderBrush="#3A3A3A"
                 BorderThickness="1"
@@ -90,8 +91,8 @@
                 BorderThickness="1"
                 Background="#242424">
             <Grid>
-                <controls:ZoomPanImageViewer Margin="12"
-                                             Source="{Binding ResultImage}"
+                <controls:ImageCompareViewer LeftSource="{Binding ViewportCaptureImage}"
+                                             RightSource="{Binding ResultImage}"
                                              IsVisible="{Binding ShowResultImage}" />
 
                 <Grid IsHitTestVisible="False">
