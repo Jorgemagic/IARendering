@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using IARendering.Features.StableDiffusion;
 
 namespace IARendering.Features.Launcher
 {
@@ -28,6 +29,8 @@ namespace IARendering.Features.Launcher
         private string aiRenderPrompt = DefaultAiRenderPrompt;
         private float aiRenderCfgScale = 1.0f;
         private int aiRenderSteps = 4;
+        private StableDiffusionRuntime aiRenderRuntime = StableDiffusionRuntime.GPU;
+        private DateTimeOffset? aiRenderStartedAtUtc;
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -51,6 +54,8 @@ namespace IARendering.Features.Launcher
 
         public int AiRenderSteps => this.aiRenderSteps;
 
+        public StableDiffusionRuntime AiRenderRuntime => this.aiRenderRuntime;
+
         public bool IsModelLoading => this.workflowState == LauncherWorkflowState.LoadingModel;
 
         public bool IsModelReady =>
@@ -70,6 +75,8 @@ namespace IARendering.Features.Launcher
         public bool ShowRenderSpinner => this.workflowState == LauncherWorkflowState.GeneratingRender;
 
         public bool HasRenderResult => !string.IsNullOrWhiteSpace(this.resultImagePath);
+
+        public DateTimeOffset? AiRenderStartedAtUtc => this.aiRenderStartedAtUtc;
 
         public void SetAiSettingsPanelOpen(bool value)
         {
@@ -122,6 +129,15 @@ namespace IARendering.Features.Launcher
             }
         }
 
+        public void SetAiRenderRuntime(StableDiffusionRuntime value)
+        {
+            if (this.aiRenderRuntime != value)
+            {
+                this.aiRenderRuntime = value;
+                this.OnPropertyChanged(nameof(this.AiRenderRuntime));
+            }
+        }
+
         public void SetSupportedExtensions(IEnumerable<string> extensions)
         {
             if (extensions == null)
@@ -149,6 +165,7 @@ namespace IARendering.Features.Launcher
 
         public void BeginModelLoad()
         {
+            this.aiRenderStartedAtUtc = null;
             this.viewportCaptureImagePath = null;
             this.resultImagePath = null;
             this.lastRenderDurationText = "Last Render Time: --";
@@ -173,6 +190,7 @@ namespace IARendering.Features.Launcher
 
         public void FailModelLoad(string? statusMessage = null)
         {
+            this.aiRenderStartedAtUtc = null;
             this.viewportCaptureImagePath = null;
             this.resultImagePath = null;
             this.lastRenderDurationText = "Last Render Time: --";
@@ -188,7 +206,9 @@ namespace IARendering.Features.Launcher
                 throw new ArgumentException("Viewport capture image path is required.", nameof(viewportCaptureImagePath));
             }
 
+            this.aiRenderStartedAtUtc = DateTimeOffset.UtcNow;
             this.viewportCaptureImagePath = viewportCaptureImagePath;
+            this.lastRenderDurationText = BuildDurationText(TimeSpan.Zero);
             this.statusMessage = "Generating IA render...";
             this.workflowState = LauncherWorkflowState.GeneratingRender;
             this.NotifyVisualStateChanged();
@@ -201,8 +221,9 @@ namespace IARendering.Features.Launcher
                 throw new ArgumentException("Output image path is required.", nameof(outputImagePath));
             }
 
+            this.aiRenderStartedAtUtc = null;
             this.resultImagePath = outputImagePath;
-            this.lastRenderDurationText = $"Last Render Time: {FormatDuration(duration)}";
+            this.lastRenderDurationText = BuildDurationText(duration);
             this.statusMessage = "IA render generated successfully.";
             this.workflowState = LauncherWorkflowState.Ready;
             this.NotifyVisualStateChanged();
@@ -210,9 +231,25 @@ namespace IARendering.Features.Launcher
 
         public void FailAiRenderGeneration(string? statusMessage = null)
         {
+            if (this.aiRenderStartedAtUtc.HasValue)
+            {
+                this.lastRenderDurationText = BuildDurationText(DateTimeOffset.UtcNow - this.aiRenderStartedAtUtc.Value);
+            }
+
+            this.aiRenderStartedAtUtc = null;
             this.statusMessage = string.IsNullOrWhiteSpace(statusMessage) ? "IA render generation failed." : statusMessage;
             this.workflowState = LauncherWorkflowState.Ready;
             this.NotifyVisualStateChanged();
+        }
+
+        public string GetRenderDurationText()
+        {
+            if (this.workflowState == LauncherWorkflowState.GeneratingRender && this.aiRenderStartedAtUtc.HasValue)
+            {
+                return BuildDurationText(DateTimeOffset.UtcNow - this.aiRenderStartedAtUtc.Value);
+            }
+
+            return this.lastRenderDurationText;
         }
 
         private void NotifyVisualStateChanged()
@@ -233,19 +270,15 @@ namespace IARendering.Features.Launcher
             this.OnPropertyChanged(nameof(this.HasRenderResult));
         }
 
+        private static string BuildDurationText(TimeSpan duration)
+        {
+            return $"Last Render Time: {FormatDuration(duration)}";
+        }
+
         private static string FormatDuration(TimeSpan duration)
         {
-            if (duration.TotalHours >= 1)
-            {
-                return duration.ToString(@"hh\:mm\:ss");
-            }
-
-            if (duration.TotalMinutes >= 1)
-            {
-                return duration.ToString(@"mm\:ss");
-            }
-
-            return $"{duration.TotalSeconds:F1}s";
+            var totalMinutes = (int)duration.TotalMinutes;
+            return $"{totalMinutes:00}:{duration.Seconds:00}:{duration.Milliseconds:000}";
         }
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

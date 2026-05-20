@@ -67,7 +67,7 @@
                 BorderBrush="#3A3A3A"
                 BorderThickness="1,0,1,0"
                 Background="#242424">
-            <Grid ColumnDefinitions="Auto,*,Auto">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto">
                 <primitives:ToggleButton Margin="12,8,0,8"
                                          Padding="14,8"
                                          VerticalAlignment="Center"
@@ -81,7 +81,14 @@
                            Foreground="#F0F0F0"
                            Text="{Binding StatusMessage}" />
 
-                <Button Grid.Column="2"
+                <ComboBox Grid.Column="2"
+                          Width="90"
+                          Margin="0,8,8,8"
+                          VerticalAlignment="Center"
+                          ItemsSource="{Binding AiRenderRuntimeOptions}"
+                          SelectedItem="{Binding SelectedAiRenderRuntime, Mode=TwoWay}" />
+
+                <Button Grid.Column="3"
                         Margin="12,8"
                         Padding="18,8"
                         Click="GenerateAiRender_Click"
@@ -169,6 +176,7 @@
                        HorizontalAlignment="Right"
                        VerticalAlignment="Center"
                        FontSize="14"
+                       FontFamily="Consolas"
                        Foreground="#F0F0F0"
                        Text="{Binding LastRenderDurationText}" />
         </Border>

@@ -294,7 +294,8 @@ namespace IARendering.Features.RuntimeAssets
                     aiRenderPath,
                     this.launcherState.AiRenderPrompt,
                     captureWidth,
-                    captureHeight);
+                    captureHeight,
+                    this.launcherState.AiRenderRuntime);
                 options.CfgScale = this.launcherState.AiRenderCfgScale;
                 options.Steps = this.launcherState.AiRenderSteps;
 

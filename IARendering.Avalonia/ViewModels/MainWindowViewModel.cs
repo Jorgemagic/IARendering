@@ -1,7 +1,9 @@
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using IARendering.Features.Launcher;
+using IARendering.Features.StableDiffusion;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
 using System.IO;
@@ -12,6 +14,7 @@ namespace IARendering.Avalonia.ViewModels
     public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
     {
         private readonly LauncherStateService launcherState;
+        private readonly DispatcherTimer renderDurationTimer;
         private Bitmap? viewportCaptureImage;
         private Bitmap? resultImage;
         private string? loadedViewportCaptureImagePath;
@@ -23,6 +26,7 @@ namespace IARendering.Avalonia.ViewModels
         private string aiRenderCfgScaleText = string.Empty;
         private string aiRenderStepsText = string.Empty;
         private string aiRenderSettingsErrorMessage = string.Empty;
+        private StableDiffusionRuntime selectedAiRenderRuntime;
         private bool canGenerateRender;
         private bool isAiSettingsPanelOpen;
         private bool showViewportSurface;
@@ -30,9 +34,20 @@ namespace IARendering.Avalonia.ViewModels
         private bool showViewportSpinner;
         private bool showRenderSpinner;
 
+        private static readonly IReadOnlyList<StableDiffusionRuntime> aiRenderRuntimeOptions =
+        [
+            StableDiffusionRuntime.GPU,
+            StableDiffusionRuntime.CPU,
+        ];
+
         public MainWindowViewModel(LauncherStateService launcherState)
         {
             this.launcherState = launcherState ?? throw new ArgumentNullException(nameof(launcherState));
+            this.renderDurationTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(100),
+            };
+            this.renderDurationTimer.Tick += this.OnRenderDurationTimerTick;
             this.launcherState.PropertyChanged += this.OnLauncherStateChanged;
             this.RefreshFromState();
         }
@@ -101,6 +116,20 @@ namespace IARendering.Avalonia.ViewModels
                 if (this.SetProperty(ref this.aiRenderSettingsErrorMessage, value))
                 {
                     this.OnPropertyChanged(nameof(this.HasAiRenderSettingsError));
+                }
+            }
+        }
+
+        public IReadOnlyList<StableDiffusionRuntime> AiRenderRuntimeOptions => aiRenderRuntimeOptions;
+
+        public StableDiffusionRuntime SelectedAiRenderRuntime
+        {
+            get => this.selectedAiRenderRuntime;
+            set
+            {
+                if (this.SetProperty(ref this.selectedAiRenderRuntime, value))
+                {
+                    this.launcherState.SetAiRenderRuntime(value);
                 }
             }
         }
@@ -211,6 +240,8 @@ namespace IARendering.Avalonia.ViewModels
 
         public void Dispose()
         {
+            this.renderDurationTimer.Stop();
+            this.renderDurationTimer.Tick -= this.OnRenderDurationTimerTick;
             this.launcherState.PropertyChanged -= this.OnLauncherStateChanged;
             this.ViewportCaptureImage = null;
             this.ResultImage = null;
@@ -225,10 +256,11 @@ namespace IARendering.Avalonia.ViewModels
         {
             this.SupportedExtensionsText = this.launcherState.SupportedExtensionsText;
             this.StatusMessage = this.launcherState.StatusMessage;
-            this.LastRenderDurationText = this.launcherState.LastRenderDurationText;
+            this.LastRenderDurationText = this.launcherState.GetRenderDurationText();
             this.AiRenderPrompt = this.launcherState.AiRenderPrompt;
             this.AiRenderCfgScaleText = this.launcherState.AiRenderCfgScale.ToString("0.##", CultureInfo.InvariantCulture);
             this.AiRenderStepsText = this.launcherState.AiRenderSteps.ToString(CultureInfo.InvariantCulture);
+            this.SelectedAiRenderRuntime = this.launcherState.AiRenderRuntime;
             this.IsAiSettingsPanelOpen = this.launcherState.IsAiSettingsPanelOpen;
             this.ShowViewportSurface = this.launcherState.ShowViewportSurface;
             this.ShowViewportPlaceholder = this.launcherState.ShowViewportPlaceholder;
@@ -236,6 +268,7 @@ namespace IARendering.Avalonia.ViewModels
             this.ShowRenderSpinner = this.launcherState.ShowRenderSpinner;
             this.UpdateViewportCaptureImage(this.launcherState.ViewportCaptureImagePath);
             this.UpdateResultImage(this.launcherState.ResultImagePath);
+            this.UpdateRenderDurationTimer();
             this.RefreshGenerateAvailability();
         }
 
@@ -273,6 +306,26 @@ namespace IARendering.Avalonia.ViewModels
         private void RefreshGenerateAvailability()
         {
             this.CanGenerateRender = this.launcherState.CanGenerateRender && !this.HasAiRenderSettingsError;
+        }
+
+        private void UpdateRenderDurationTimer()
+        {
+            if (this.launcherState.IsGeneratingRender)
+            {
+                if (!this.renderDurationTimer.IsEnabled)
+                {
+                    this.renderDurationTimer.Start();
+                }
+            }
+            else
+            {
+                this.renderDurationTimer.Stop();
+            }
+        }
+
+        private void OnRenderDurationTimerTick(object? sender, EventArgs e)
+        {
+            this.LastRenderDurationText = this.launcherState.GetRenderDurationText();
         }
 
         private static bool TryParseFloat(string? text, out float value)

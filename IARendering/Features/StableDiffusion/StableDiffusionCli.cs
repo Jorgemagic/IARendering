@@ -21,15 +21,16 @@ namespace IARendering.Features.StableDiffusion
             this.repositoryRoot = repositoryRoot ?? throw new ArgumentNullException(nameof(repositoryRoot));
         }
 
-        public StableDiffusionCliOptions CreateDefaultFluxKleinOptions(string inputImagePath, string outputImagePath, string prompt, int width, int height)
+        public StableDiffusionCliOptions CreateDefaultFluxKleinOptions(string inputImagePath, string outputImagePath, string prompt, int width, int height, StableDiffusionRuntime runtime)
         {
             var stableDiffusionDirectory = this.GetStableDiffusionDirectory();
             var modelDirectory = Path.Combine(stableDiffusionDirectory, "models", "FluxKlein");
+            var implementationDirectory = this.GetImplementationDirectory(runtime);
 
             return new StableDiffusionCliOptions
             {
-                ExecutablePath = Path.Combine(stableDiffusionDirectory, "sd-cli.exe"),
-                WorkingDirectory = stableDiffusionDirectory,
+                ExecutablePath = Path.Combine(implementationDirectory, "sd-cli.exe"),
+                WorkingDirectory = implementationDirectory,
                 DiffusionModelPath = Path.Combine(modelDirectory, "flux-2-klein-4b-Q8_0.gguf"),
                 VaePath = Path.Combine(modelDirectory, "full_encoder_small_decoder.safetensors"),
                 LlmPath = Path.Combine(modelDirectory, "Qwen3-4B-Q4_K_M.gguf"),
@@ -115,6 +116,17 @@ namespace IARendering.Features.StableDiffusion
         public string GetStableDiffusionDirectory()
         {
             return Path.Combine(this.repositoryRoot, "StableDiffusion");
+        }
+
+        public string GetImplementationDirectory(StableDiffusionRuntime runtime)
+        {
+            var directoryName = runtime switch
+            {
+                StableDiffusionRuntime.CPU => "sd-cli-avx2",
+                _ => "sd-cli-cuda",
+            };
+
+            return Path.Combine(this.GetStableDiffusionDirectory(), directoryName);
         }
 
         private static void AddArguments(ProcessStartInfo startInfo, StableDiffusionCliOptions options)
