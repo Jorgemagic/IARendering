@@ -2,10 +2,8 @@ using Evergine.Bullet;
 using Evergine.Framework;
 using Evergine.Framework.Graphics;
 using Evergine.Mathematics;
-using Evergine.UI;
 using IARendering.Features.Camera;
 using IARendering.Features.RuntimeAssets;
-using IARendering.Features.UI;
 
 namespace IARendering
 {
@@ -16,7 +14,6 @@ namespace IARendering
             base.RegisterManagers();
             
             this.Managers.AddManager(new BulletPhysicManager3D());
-            this.Managers.AddManager(new ImGuiManager());
             this.Managers.AddManager(new RuntimeAssetManager());
         }
 
@@ -46,18 +43,6 @@ namespace IARendering
             cameraRoot.AddChild(camera);
 
             this.Managers.EntityManager.Add(cameraRoot);
-
-            // Create UI
-            Entity ui = new Entity()
-                .AddComponent(new Transform3D())
-                .AddComponent(new UIComponent()
-                {
-                    UpdateOrder = 0.5f,
-                });
-
-            this.Managers.EntityManager.Add(ui);
-
-
         }
     }
 }

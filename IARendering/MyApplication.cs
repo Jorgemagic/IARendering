@@ -2,17 +2,20 @@ using Evergine.Common.IO;
 using Evergine.Framework;
 using Evergine.Framework.Services;
 using Evergine.Framework.Threading;
+using IARendering.Features.Launcher;
 using System;
 
 namespace IARendering
 {
     public partial class MyApplication : Application
     {
-        public static event EventHandler<string> OnNewRuntimeAsset;
+        public static event EventHandler<LauncherRenderRequest>? OnNewRuntimeAsset;
+
+        public static event EventHandler? OnAiRenderRequested;
 
         public delegate bool IsRuntimeAssetValidDelegate(string filePath);
 
-        public static IsRuntimeAssetValidDelegate IsRuntimeAssetValid;
+        public static IsRuntimeAssetValidDelegate? IsRuntimeAssetValid;
 
         public MyApplication()
         {
@@ -27,6 +30,7 @@ namespace IARendering
             this.Container.Register<AssetsService>();
             this.Container.Register<ForegroundTaskSchedulerService>();
             this.Container.Register<WorkActionScheduler>();
+            this.Container.Register<LauncherStateService>();
         }
 
         public override void Initialize()
@@ -45,7 +49,12 @@ namespace IARendering
 
         public static void NewRuntimeAssetToLoad(string path)
         {
-            OnNewRuntimeAsset?.Invoke(null, path);
+            OnNewRuntimeAsset?.Invoke(null, new LauncherRenderRequest(path));
+        }
+
+        public static void RequestAiRenderGeneration()
+        {
+            OnAiRenderRequested?.Invoke(null, EventArgs.Empty);
         }
 
         public static bool IsValidRuntimeAsset(string filePath)

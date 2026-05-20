@@ -21,7 +21,7 @@ namespace IARendering.Features.StableDiffusion
             this.repositoryRoot = repositoryRoot ?? throw new ArgumentNullException(nameof(repositoryRoot));
         }
 
-        public StableDiffusionCliOptions CreateDefaultFluxKleinOptions(string inputImagePath, string outputImagePath, string prompt)
+        public StableDiffusionCliOptions CreateDefaultFluxKleinOptions(string inputImagePath, string outputImagePath, string prompt, int width, int height)
         {
             var stableDiffusionDirectory = this.GetStableDiffusionDirectory();
             var modelDirectory = Path.Combine(stableDiffusionDirectory, "models", "FluxKlein");
@@ -36,8 +36,8 @@ namespace IARendering.Features.StableDiffusion
                 InputImagePath = inputImagePath,
                 OutputImagePath = outputImagePath,
                 Prompt = prompt,
-                Width = 1024,
-                Height = 1024,
+                Width = width,
+                Height = height,
                 CfgScale = 1.0f,
                 Steps = 4,
                 SamplingMethod = "euler",

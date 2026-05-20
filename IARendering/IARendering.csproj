@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
 		<TargetFramework>net10.0</TargetFramework>
+		<Nullable>enable</Nullable>
 		<GenerateEvergineContent>True</GenerateEvergineContent>
 		<GenerateEvergineAssets>False</GenerateEvergineAssets>
 		<GenerateEvergineScenesCode>True</GenerateEvergineScenesCode>
@@ -14,7 +15,6 @@
 		<PackageReference Include="Evergine.Bullet" Version="2026.5.19.266-nightly" />
 		<PackageReference Include="Evergine.Targets" Version="2026.5.19.266-nightly" />
 		<PackageReference Include="Evergine.CodeScenes" Version="2026.5.19.266-nightly" />
-		<PackageReference Include="Evergine.ImGui" Version="2026.5.19.266-nightly" />
 	</ItemGroup>
 	<!--Runtimes-->
 	<ItemGroup>
