@@ -50,6 +50,7 @@ The script downloads and prepares:
 - The VAE
 - The auxiliary LLM
 - The CUDA `sd-cli` runtime
+- The CUDA dependency package required on machines without a system CUDA installation
 - The AVX2 `sd-cli` runtime
 
 Useful script options:

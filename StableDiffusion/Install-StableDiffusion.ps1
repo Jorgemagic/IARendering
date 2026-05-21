@@ -6,6 +6,7 @@ Downloads the Stable Diffusion runtime used by this repository.
 This script recreates the expected StableDiffusion folder layout by downloading:
 - Flux.2 Klein model files
 - sd-cli CUDA runtime
+- CUDA runtime dependencies for sd-cli
 - sd-cli AVX2 runtime
 
 Run from PowerShell:
@@ -32,6 +33,7 @@ $capturesDirectory = Join-Path $scriptRoot 'captures'
 $resultsDirectory = Join-Path $scriptRoot 'results'
 $cudaDirectory = Join-Path $scriptRoot 'sd-cli-cuda'
 $cpuDirectory = Join-Path $scriptRoot 'sd-cli-avx2'
+$cudaDependencyMarkerPath = Join-Path $cudaDirectory '.cuda-dependencies-installed'
 $temporaryRoot = Join-Path ([IO.Path]::GetTempPath()) ("IARendering-StableDiffusion-" + [Guid]::NewGuid().ToString('N'))
 
 function Write-Step {
@@ -177,6 +179,18 @@ if (-not $SkipCpu) {
     }
 }
 
+$cudaDependencyDownload = $null
+
+if (-not $SkipCuda) {
+    $cudaDependencyDownload = @{
+        Name = 'sd-cli CUDA runtime dependencies'
+        Url = 'https://github.com/leejet/stable-diffusion.cpp/releases/download/master-633-5b0267e/cudart-sd-bin-win-cu12-x64.zip'
+        ArchiveName = 'sd-cli-cudart.zip'
+        Destination = $cudaDirectory
+        MarkerPath = $cudaDependencyMarkerPath
+    }
+}
+
 try {
     Write-Step 'Preparing folder structure'
     Ensure-Directory -Path $temporaryRoot
@@ -202,6 +216,20 @@ try {
         $archivePath = Join-Path $temporaryRoot $runtime.ArchiveName
         Download-File -Name $runtime.Name -Url $runtime.Url -Destination $archivePath -ForceDownload:$true
         Expand-ZipArchive -ArchivePath $archivePath -Destination $runtime.Destination
+    }
+
+    if ($null -ne $cudaDependencyDownload) {
+        Write-Step 'Downloading CUDA dependencies for sd-cli'
+
+        if ((-not (Test-Path -LiteralPath $cudaDependencyDownload.MarkerPath)) -or $Force) {
+            $archivePath = Join-Path $temporaryRoot $cudaDependencyDownload.ArchiveName
+            Download-File -Name $cudaDependencyDownload.Name -Url $cudaDependencyDownload.Url -Destination $archivePath -ForceDownload:$true
+            Expand-ZipArchive -ArchivePath $archivePath -Destination $cudaDependencyDownload.Destination
+            Set-Content -LiteralPath $cudaDependencyDownload.MarkerPath -Value 'installed' -NoNewline
+        }
+        else {
+            Write-Host "Skipping $($cudaDependencyDownload.Name) because it already exists." -ForegroundColor Yellow
+        }
     }
 
     Write-Step 'Completed successfully'
